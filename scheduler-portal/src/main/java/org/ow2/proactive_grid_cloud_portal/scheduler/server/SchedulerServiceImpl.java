@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -46,6 +47,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import javax.servlet.ServletConfig;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -88,6 +90,7 @@ import org.ow2.proactive_grid_cloud_portal.scheduler.shared.filter.FilterModel;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
+import com.google.gwt.core.client.GWT;
 
 
 /**
@@ -1084,17 +1087,29 @@ public class SchedulerServiceImpl extends Service implements SchedulerService {
     public String revisionAndjobsinfo(final String sessionId, final String startCursor, final String endCursor,
             int pageSize, boolean first, final String user, final boolean pending, final boolean running,
             final boolean finished, FilterModel filterModel) throws RestServerException, ServiceException {
-        Query query = GraphQLQueries.get().getRevisionAndjobsInfoQuery(user,
-                                                                       pending,
-                                                                       running,
-                                                                       finished,
-                                                                       startCursor,
-                                                                       endCursor,
-                                                                       pageSize,
-                                                                       first,
-                                                                       filterModel);
-        String response = executeGraphQLQuery(sessionId, query);
-        return response;
+        //        Query query = GraphQLQueries.get().getRevisionAndjobsInfoQuery(user,
+        //                                                                       pending,
+        //                                                                       running,
+        //                                                                       finished,
+        //                                                                       startCursor,
+        //                                                                       endCursor,
+        //                                                                       pageSize,
+        //                                                                       first,
+        //                                                                       filterModel);
+        //        String response = executeGraphQLQuery(sessionId, query);
+        GWT.log("fetching via graphQL !!!");
+        String result = "";
+        ServletConfig sc = getServletConfig();
+        if (sc == null) {
+            throw new IllegalStateException("Oopsie !");
+        }
+        try {
+            File fileHandler = new File(sc.getServletContext().getRealPath("graphqlstuff.txt"));
+            result = Files.readFirstLine(fileHandler, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     /*

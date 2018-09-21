@@ -44,7 +44,9 @@ import org.ow2.proactive_grid_cloud_portal.scheduler.client.json.SchedulerJSONUt
 import org.ow2.proactive_grid_cloud_portal.scheduler.client.model.ExecutionsModel;
 import org.ow2.proactive_grid_cloud_portal.scheduler.client.model.JobsModel;
 import org.ow2.proactive_grid_cloud_portal.scheduler.client.view.JobsView;
+import org.ow2.proactive_grid_cloud_portal.scheduler.shared.SchedulerConfig;
 
+import com.google.gwt.core.client.GWT;
 import com.google.gwt.http.client.Response;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.smartgwt.client.widgets.layout.Layout;
@@ -76,6 +78,55 @@ public class JobsController {
      * The view controlled by this controller.
      */
     protected JobsView view;
+
+    /**
+     * The job fetching callback.
+     */
+    final AsyncCallback<String> callback = new AsyncCallback<String>() {
+
+        public void onFailure(Throwable caught) {
+            if (!LoginModel.getInstance().isLoggedIn()) {
+                // might have been disconnected in between
+                return;
+            }
+            int httpErrorCodeFromException = JSONUtils.getJsonErrorCode(caught);
+            if (httpErrorCodeFromException == Response.SC_UNAUTHORIZED) {
+                parentController.getParentController().teardown("You have been disconnected from the server.");
+            } else if (httpErrorCodeFromException == Response.SC_FORBIDDEN) {
+                LogModel.getInstance().logImportantMessage(
+                        "Failed to fetch jobs because of permission (automatic refresh will be disabled)" +
+                                JSONUtils.getJsonErrorMessage(caught));
+                parentController.getParentController().stopTimer();
+                // display empty message in jobs view
+                model.emptyJobs();
+            } else {
+                LogModel.getInstance()
+                        .logCriticalMessage("Error while fetching jobs:\n" + JSONUtils.getJsonErrorMessage(caught));
+            }
+        }
+
+        public void onSuccess(String result) {
+
+            final long t1 = System.currentTimeMillis();
+            Map<Integer, Job> jobs;
+            try {
+                jobs = SchedulerJSONUtils.parseJSONJobs(result, paginationController.getModel());
+                model.setJobs(jobs);
+                int jn = jobs.size();
+                if (jobs.size() > 0) {
+                    long t = (System.currentTimeMillis() - t1);
+                    LogModel.getInstance()
+                            .logMessage("<span style='color:gray;'>Fetched " + jn + " jobs in " + t + " ms</span>");
+                }
+            } catch (org.ow2.proactive_grid_cloud_portal.common.client.json.JSONException e) {
+                GWT.log(e.getMessage());
+                LogModel.getInstance().logCriticalMessage(e.getMessage());
+                LOGGER.log(Level.SEVERE, e.getMessage());
+            }
+            jobs = null;
+            parentController.getParentController().scheduleNextTimerUpdate();
+        }
+    };
 
     private static Logger LOGGER = Logger.getLogger(JobsController.class.getName());
 
@@ -354,11 +405,12 @@ public class JobsController {
      * update the model and views
      */
     public void fetchJobs(boolean showUpdating) {
+
+        GWT.log("Fetching jobs !");
+
         if (showUpdating) {
             model.jobsUpdating();
         }
-
-        final long t1 = System.currentTimeMillis();
 
         String startCursor = paginationController.getModel().getStartCursor();
         String endCursor = paginationController.getModel().getEndCursor();
@@ -386,51 +438,8 @@ public class JobsController {
                                       fetchRunning,
                                       fetchFinished,
                                       model.getFilterModel(),
-                                      new AsyncCallback<String>() {
+                                      callback);
 
-                                          public void onFailure(Throwable caught) {
-                                              if (!LoginModel.getInstance().isLoggedIn()) {
-                                                  // might have been disconnected in between
-                                                  return;
-                                              }
-                                              int httpErrorCodeFromException = JSONUtils.getJsonErrorCode(caught);
-                                              if (httpErrorCodeFromException == Response.SC_UNAUTHORIZED) {
-                                                  parentController.getParentController()
-                                                                  .teardown("You have been disconnected from the server.");
-                                              } else if (httpErrorCodeFromException == Response.SC_FORBIDDEN) {
-                                                  LogModel.getInstance()
-                                                          .logImportantMessage("Failed to fetch jobs because of permission (automatic refresh will be disabled)" +
-                                                                               JSONUtils.getJsonErrorMessage(caught));
-                                                  parentController.getParentController().stopTimer();
-                                                  // display empty message in jobs view
-                                                  model.emptyJobs();
-                                              } else {
-                                                  LogModel.getInstance()
-                                                          .logCriticalMessage("Error while fetching jobs:\n" +
-                                                                              JSONUtils.getJsonErrorMessage(caught));
-                                              }
-                                          }
-
-                                          public void onSuccess(String result) {
-                                              Map<Integer, Job> jobs;
-                                              try {
-                                                  jobs = SchedulerJSONUtils.parseJSONJobs(result,
-                                                                                          paginationController.getModel());
-                                                  model.setJobs(jobs);
-
-                                                  int jn = jobs.size();
-                                                  if (jn > 0) {
-                                                      long t = (System.currentTimeMillis() - t1);
-                                                      LogModel.getInstance()
-                                                              .logMessage("<span style='color:gray;'>Fetched " + jn +
-                                                                          " jobs in " + t + " ms</span>");
-                                                  }
-                                              } catch (org.ow2.proactive_grid_cloud_portal.common.client.json.JSONException e) {
-                                                  LogModel.getInstance().logCriticalMessage(e.getMessage());
-                                                  LOGGER.log(Level.SEVERE, e.getMessage());
-                                              }
-                                          }
-                                      });
     }
 
     /**
@@ -453,6 +462,7 @@ public class JobsController {
             }
 
             public void onSuccess(Long result) {
+                GWT.log("jobsStateRevision: sessionid=" + result);
                 fetchJobs(false);
             }
         });

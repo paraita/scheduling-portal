@@ -50,6 +50,7 @@ import org.ow2.proactive_grid_cloud_portal.scheduler.client.model.ExecutionsMode
 import org.ow2.proactive_grid_cloud_portal.scheduler.shared.SchedulerConfig;
 import org.ow2.proactive_grid_cloud_portal.scheduler.shared.SchedulerPortalDisplayConfig;
 
+import com.google.gwt.core.client.GWT;
 import com.google.gwt.core.client.GWT.UncaughtExceptionHandler;
 import com.google.gwt.json.client.JSONArray;
 import com.google.gwt.json.client.JSONException;
@@ -280,7 +281,7 @@ public class SchedulerController extends Controller implements UncaughtException
         this.loginView = null;
         this.schedulerView = new SchedulerPage(this);
 
-        this.executionController.getJobsController().fetchJobs(true);
+        //this.executionController.getJobsController().fetchJobs(true);
 
         this.startTimer();
 
@@ -555,134 +556,141 @@ public class SchedulerController extends Controller implements UncaughtException
                              "Another tab or window in this browser is accessing this page.");
                 }
 
-                SchedulerController.this.updateSchedulerStatus();
+                //SchedulerController.this.updateSchedulerStatus();
 
                 executionController.executionStateRevision(false);
 
-                if (timerUpdate % userFetchTick == 0) {
-                    final long t1 = System.currentTimeMillis();
-
-                    scheduler.getSchedulerUsers(LoginModel.getInstance().getSessionId(), new AsyncCallback<String>() {
-                        public void onSuccess(String result) {
-                            List<SchedulerUser> users;
-
-                            JSONValue val = parseJSON(result);
-                            JSONArray arr = val.isArray();
-                            if (arr == null) {
-                                error("Expected JSON Array: " + val.toString());
-                            }
-                            users = getUsersFromJson(arr);
-                            model.setSchedulerUsers(users);
-
-                            long t = (System.currentTimeMillis() - t1);
-                            LogModel.getInstance().logMessage("<span style='color:gray;'>Fetched " + users.size() +
-                                                              " users in " + t + " ms</span>");
-                        }
-
-                        public void onFailure(Throwable caught) {
-                            if (!LoginModel.getInstance().isLoggedIn())
-                                return;
-
-                            error("Failed to fetch scheduler users:<br>" + JSONUtils.getJsonErrorMessage(caught));
-                        }
-                    });
-                }
-
-                if (timerUpdate % statsFetchTick == 0) {
-                    final long t1 = System.currentTimeMillis();
-
-                    scheduler.getStatistics(LoginModel.getInstance().getSessionId(), new AsyncCallback<String>() {
-                        public void onFailure(Throwable caught) {
-                            String msg = JSONUtils.getJsonErrorMessage(caught);
-                            if (!LoginModel.getInstance().isLoggedIn())
-                                return;
-                            error("Failed to fetch scheduler stats:<br>" + msg);
-                        }
-
-                        public void onSuccess(String result) {
-                            HashMap<String, String> stats = new HashMap<String, String>();
-
-                            JSONObject json = parseJSON(result).isObject();
-                            if (json == null)
-                                error("Expected JSON Object: " + result);
-
-                            stats.put("JobSubmittingPeriod", json.get("JobSubmittingPeriod").isString().stringValue());
-                            stats.put("FormattedJobSubmittingPeriod",
-                                      json.get("FormattedJobSubmittingPeriod").isString().stringValue());
-                            stats.put("MeanJobPendingTime", json.get("MeanJobPendingTime").isString().stringValue());
-                            stats.put("ConnectedUsersCount", json.get("ConnectedUsersCount").isString().stringValue());
-                            stats.put("FinishedTasksCount", json.get("FinishedTasksCount").isString().stringValue());
-                            stats.put("RunningJobsCount", json.get("RunningJobsCount").isString().stringValue());
-                            stats.put("RunningTasksCount", json.get("RunningTasksCount").isString().stringValue());
-                            stats.put("FormattedMeanJobPendingTime",
-                                      json.get("FormattedMeanJobPendingTime").isString().stringValue());
-                            stats.put("MeanJobExecutionTime",
-                                      json.get("MeanJobExecutionTime").isString().stringValue());
-                            stats.put("PendingTasksCount", json.get("PendingTasksCount").isString().stringValue());
-                            stats.put("FinishedJobsCount", json.get("FinishedJobsCount").isString().stringValue());
-                            stats.put("TotalTasksCount", json.get("TotalTasksCount").isString().stringValue());
-                            stats.put("FormattedMeanJobExecutionTime",
-                                      json.get("FormattedMeanJobExecutionTime").isString().stringValue());
-                            stats.put("TotalJobsCount", json.get("TotalJobsCount").isString().stringValue());
-                            stats.put("PendingJobsCount", json.get("PendingJobsCount").isString().stringValue());
-
-                            model.setSchedulerStatistics(stats);
-
-                            long t = (System.currentTimeMillis() - t1);
-                            LogModel.getInstance().logMessage("<span style='color:gray;'>Fetched sched stats: " +
-                                                              result.length() + " chars in " + t + " ms</span>");
-                        }
-                    });
-
-                    final long t2 = System.currentTimeMillis();
-
-                    scheduler.getStatisticsOnMyAccount(LoginModel.getInstance().getSessionId(),
-                                                       new AsyncCallback<String>() {
-                                                           public void onFailure(Throwable caught) {
-                                                               if (!LoginModel.getInstance().isLoggedIn())
-                                                                   return;
-                                                               error("Failed to fetch account stats:<br>" +
-                                                                     JSONUtils.getJsonErrorMessage(caught));
-                                                           }
-
-                                                           public void onSuccess(String result) {
-                                                               HashMap<String, String> stats = new HashMap<String, String>();
-
-                                                               JSONObject json = parseJSON(result).isObject();
-                                                               if (json == null)
-                                                                   error("Expected JSON Object: " + result);
-
-                                                               stats.put("TotalTaskCount",
-                                                                         json.get("TotalTaskCount")
-                                                                             .isString()
-                                                                             .stringValue());
-                                                               stats.put("TotalJobDuration",
-                                                                         json.get("TotalJobDuration")
-                                                                             .isString()
-                                                                             .stringValue());
-                                                               stats.put("TotalJobCount",
-                                                                         json.get("TotalJobCount")
-                                                                             .isString()
-                                                                             .stringValue());
-                                                               stats.put("TotalTaskDuration",
-                                                                         json.get("TotalTaskDuration")
-                                                                             .isString()
-                                                                             .stringValue());
-
-                                                               model.setAccountStatistics(stats);
-
-                                                               long t = (System.currentTimeMillis() - t2);
-                                                               LogModel.getInstance()
-                                                                       .logMessage("<span style='color:gray;'>Fetched account stats: " +
-                                                                                   result.length() + " chars in " + t +
-                                                                                   " ms</span>");
-                                                           }
-                                                       });
-                }
-                timerUpdate++;
+                //                if (timerUpdate % userFetchTick == 0) {
+                //                    final long t1 = System.currentTimeMillis();
+                //
+                //                    scheduler.getSchedulerUsers(LoginModel.getInstance().getSessionId(), new AsyncCallback<String>() {
+                //                        public void onSuccess(String result) {
+                //                            List<SchedulerUser> users;
+                //
+                //                            JSONValue val = parseJSON(result);
+                //                            JSONArray arr = val.isArray();
+                //                            if (arr == null) {
+                //                                error("Expected JSON Array: " + val.toString());
+                //                            }
+                //                            users = getUsersFromJson(arr);
+                //                            model.setSchedulerUsers(users);
+                //
+                //                            long t = (System.currentTimeMillis() - t1);
+                //                            LogModel.getInstance().logMessage("<span style='color:gray;'>Fetched " + users.size() +
+                //                                                              " users in " + t + " ms</span>");
+                //                        }
+                //
+                //                        public void onFailure(Throwable caught) {
+                //                            if (!LoginModel.getInstance().isLoggedIn())
+                //                                return;
+                //
+                //                            error("Failed to fetch scheduler users:<br>" + JSONUtils.getJsonErrorMessage(caught));
+                //                        }
+                //                    });
+                //                }
+                //
+                //                if (timerUpdate % statsFetchTick == 0) {
+                //                    final long t1 = System.currentTimeMillis();
+                //
+                //                    scheduler.getStatistics(LoginModel.getInstance().getSessionId(), new AsyncCallback<String>() {
+                //                        public void onFailure(Throwable caught) {
+                //                            String msg = JSONUtils.getJsonErrorMessage(caught);
+                //                            if (!LoginModel.getInstance().isLoggedIn())
+                //                                return;
+                //                            error("Failed to fetch scheduler stats:<br>" + msg);
+                //                        }
+                //
+                //                        public void onSuccess(String result) {
+                //                            HashMap<String, String> stats = new HashMap<String, String>();
+                //
+                //                            JSONObject json = parseJSON(result).isObject();
+                //                            if (json == null)
+                //                                error("Expected JSON Object: " + result);
+                //
+                //                            stats.put("JobSubmittingPeriod", json.get("JobSubmittingPeriod").isString().stringValue());
+                //                            stats.put("FormattedJobSubmittingPeriod",
+                //                                      json.get("FormattedJobSubmittingPeriod").isString().stringValue());
+                //                            stats.put("MeanJobPendingTime", json.get("MeanJobPendingTime").isString().stringValue());
+                //                            stats.put("ConnectedUsersCount", json.get("ConnectedUsersCount").isString().stringValue());
+                //                            stats.put("FinishedTasksCount", json.get("FinishedTasksCount").isString().stringValue());
+                //                            stats.put("RunningJobsCount", json.get("RunningJobsCount").isString().stringValue());
+                //                            stats.put("RunningTasksCount", json.get("RunningTasksCount").isString().stringValue());
+                //                            stats.put("FormattedMeanJobPendingTime",
+                //                                      json.get("FormattedMeanJobPendingTime").isString().stringValue());
+                //                            stats.put("MeanJobExecutionTime",
+                //                                      json.get("MeanJobExecutionTime").isString().stringValue());
+                //                            stats.put("PendingTasksCount", json.get("PendingTasksCount").isString().stringValue());
+                //                            stats.put("FinishedJobsCount", json.get("FinishedJobsCount").isString().stringValue());
+                //                            stats.put("TotalTasksCount", json.get("TotalTasksCount").isString().stringValue());
+                //                            stats.put("FormattedMeanJobExecutionTime",
+                //                                      json.get("FormattedMeanJobExecutionTime").isString().stringValue());
+                //                            stats.put("TotalJobsCount", json.get("TotalJobsCount").isString().stringValue());
+                //                            stats.put("PendingJobsCount", json.get("PendingJobsCount").isString().stringValue());
+                //
+                //                            model.setSchedulerStatistics(stats);
+                //
+                //                            long t = (System.currentTimeMillis() - t1);
+                //                            LogModel.getInstance().logMessage("<span style='color:gray;'>Fetched sched stats: " +
+                //                                                              result.length() + " chars in " + t + " ms</span>");
+                //                        }
+                //                    });
+                //
+                //                    final long t2 = System.currentTimeMillis();
+                //
+                //                    scheduler.getStatisticsOnMyAccount(LoginModel.getInstance().getSessionId(),
+                //                                                       new AsyncCallback<String>() {
+                //                                                           public void onFailure(Throwable caught) {
+                //                                                               if (!LoginModel.getInstance().isLoggedIn())
+                //                                                                   return;
+                //                                                               error("Failed to fetch account stats:<br>" +
+                //                                                                     JSONUtils.getJsonErrorMessage(caught));
+                //                                                           }
+                //
+                //                                                           public void onSuccess(String result) {
+                //                                                               HashMap<String, String> stats = new HashMap<String, String>();
+                //
+                //                                                               JSONObject json = parseJSON(result).isObject();
+                //                                                               if (json == null)
+                //                                                                   error("Expected JSON Object: " + result);
+                //
+                //                                                               stats.put("TotalTaskCount",
+                //                                                                         json.get("TotalTaskCount")
+                //                                                                             .isString()
+                //                                                                             .stringValue());
+                //                                                               stats.put("TotalJobDuration",
+                //                                                                         json.get("TotalJobDuration")
+                //                                                                             .isString()
+                //                                                                             .stringValue());
+                //                                                               stats.put("TotalJobCount",
+                //                                                                         json.get("TotalJobCount")
+                //                                                                             .isString()
+                //                                                                             .stringValue());
+                //                                                               stats.put("TotalTaskDuration",
+                //                                                                         json.get("TotalTaskDuration")
+                //                                                                             .isString()
+                //                                                                             .stringValue());
+                //
+                //                                                               model.setAccountStatistics(stats);
+                //
+                //                                                               long t = (System.currentTimeMillis() - t2);
+                //                                                               LogModel.getInstance()
+                //                                                                       .logMessage("<span style='color:gray;'>Fetched account stats: " +
+                //                                                                                   result.length() + " chars in " + t +
+                //                                                                                   " ms</span>");
+                //                                                           }
+                //                                                       });
+                //                }
+                //                timerUpdate++;
             }
         };
-        this.schedulerTimerUpdate.scheduleRepeating(SchedulerConfig.get().getClientRefreshTime());
+        this.schedulerTimerUpdate.schedule(1);
+        //this.schedulerTimerUpdate.scheduleRepeating(SchedulerConfig.get().getClientRefreshTime());
+    }
+
+    public void scheduleNextTimerUpdate() {
+        int nextTimer = SchedulerConfig.get().getClientRefreshTime();
+        GWT.log("Next timer in " + nextTimer + " ms !!!!!!!");
+        this.schedulerTimerUpdate.schedule(nextTimer);
     }
 
     /**

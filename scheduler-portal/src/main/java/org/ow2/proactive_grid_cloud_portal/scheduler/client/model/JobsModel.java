@@ -122,9 +122,9 @@ public class JobsModel {
      * or {@link JobsUpdatedListener#jobsUpdating()} if <code>jobs</code> was null
      * 
      * @param jobs a jobset, or null
-     * @param rev the revision of this jobset
      */
     public void setJobs(Map<Integer, Job> jobs) {
+//        this.jobs.putAll(jobs);
         this.jobs = jobs;
         boolean empty = false;
 
